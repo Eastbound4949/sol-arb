@@ -32,12 +32,17 @@ from datetime import datetime
 from dotenv import load_dotenv
 from colorama import Fore, Style, init
 
-# ── Solana SDK ────────────────────────────────────────────────────────────────
-from solders.keypair import Keypair                   # type: ignore
-from solders.pubkey import Pubkey                     # type: ignore
-from solana.rpc.api import Client                     # type: ignore
-from solana.rpc.types import TxOpts                   # type: ignore
-import base58
+# ── Solana SDK (only needed for live trading; optional for DRY_RUN) ───────────
+try:
+    from solders.keypair import Keypair                   # type: ignore
+    from solders.pubkey import Pubkey                     # type: ignore
+    from solana.rpc.api import Client                     # type: ignore
+    from solana.rpc.types import TxOpts                   # type: ignore
+    import base58
+    _HAS_SDK = True
+except ImportError:
+    _HAS_SDK = False
+    Keypair = Client = TxOpts = base58 = None            # type: ignore
 
 try:
     from solders.transaction import VersionedTransaction  # type: ignore
@@ -424,6 +429,9 @@ def main() -> None:
 
     keypair = client = None
     if not DRY_RUN:
+        if not _HAS_SDK:
+            log.error("Solana SDK not installed — pip install solana solders base58")
+            return
         if not PRIVATE_KEY_B58:
             log.error("SOLANA_PRIVATE_KEY not set — use DRY_RUN=true or add key to .env")
             return
