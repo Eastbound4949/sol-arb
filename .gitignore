@@ -1,0 +1,8 @@
+.env
+*.log
+spreads.db
+__pycache__/
+*.pyc
+MIN_PROFIT_PCT
+{MIN_PROFIT_PCT}%
+New Text Document.txt
