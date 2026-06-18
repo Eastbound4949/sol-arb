@@ -78,42 +78,52 @@ JUPITER_SWAP_URL  = "https://quote-api.jup.ag/v6/swap"
 
 # ── Token Registry ────────────────────────────────────────────────────────────
 TOKENS = {
-    "SOL":   "So11111111111111111111111111111111111111112",
-    "USDC":  "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
-    "USDT":  "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
-    "RAY":   "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
-    "BONK":  "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
-    "JUP":   "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
-    "WIF":   "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+    "SOL":    "So11111111111111111111111111111111111111112",
+    "USDC":   "EPjFWdd5AufqSSqeM2qN1xzybapC8G4wEGGkZwyTDt1v",
+    "USDT":   "Es9vMFrzaCERmJfrF4H2FYD4KCoNkY11McCe8BenwNYB",
+    "RAY":    "4k3Dyjzvzp8eMZWUXbBCjEvwSkkk59S5iCNLY3QrkX6R",
+    "BONK":   "DezXAZ8z7PnrnRJjz3wXBoRgixCa6xjnB7YaB1pPB263",
+    "JUP":    "JUPyiwrYJFskUPiHa7hkeR8VUtAeFoSYbKedZNsDvCN",
+    "WIF":    "EKpQGSJtjMFqKZ9KQanSqYXRcF8fBopzLHYxdM65zcjm",
+    "MSOL":   "mSoLzYCxHdYgdzU16g5QSh3i5K3z3KZK7ytfqcJm7So",  # Marinade staked SOL
+    "POPCAT": "7GCihgDB8fe6KNjn2MYtkzZcRjQy3t9GHdC8uHYmW2hr",
+    "BOME":   "ukHH6c7mMyiWCf1b9pnWe25TSpkDDt3H5pQZgZ74J82",
 }
 
 TOKEN_DECIMALS = {
-    "SOL":  9,
-    "USDC": 6,
-    "USDT": 6,
-    "RAY":  6,
-    "BONK": 5,
-    "JUP":  6,
-    "WIF":  6,
+    "SOL":    9, "USDC": 6, "USDT": 6, "RAY":  6,
+    "BONK":   5, "JUP":  6, "WIF":  6, "MSOL": 9,
+    "POPCAT": 9, "BOME": 6,
 }
 
 # Arbitrage routes: (input_token, intermediate_token, output_token)
 ARB_ROUTES = [
-    ("USDC", "SOL",  "USDC"),
-    ("USDC", "RAY",  "USDC"),
-    ("USDC", "BONK", "USDC"),
-    ("USDC", "JUP",  "USDC"),
-    ("SOL",  "USDC", "SOL"),
-    ("SOL",  "RAY",  "SOL"),
+    ("USDC", "SOL",    "USDC"),
+    ("USDC", "RAY",    "USDC"),
+    ("USDC", "BONK",   "USDC"),
+    ("USDC", "JUP",    "USDC"),
+    ("USDC", "WIF",    "USDC"),
+    ("USDC", "POPCAT", "USDC"),
+    ("USDC", "BOME",   "USDC"),
+    ("SOL",  "USDC",   "SOL"),
+    ("SOL",  "RAY",    "SOL"),
+    ("SOL",  "MSOL",   "SOL"),   # liquid staking rate spread
+    ("SOL",  "WIF",    "SOL"),
+    ("BONK", "WIF",    "BONK"),  # cross-meme spread
+    ("WIF",  "BONK",   "WIF"),
 ]
 
 # Input amounts per route (raw units)
 ROUTE_INPUT_AMOUNTS = {
-    "USDC": 100_000_000,    # 100 USDC  (6 decimals)
-    "SOL":  100_000_000,    # 0.1 SOL   (9 decimals)
-    "RAY":  10_000_000,     # 10 RAY    (6 decimals)
-    "BONK": 10_000_000_000, # 100k BONK (5 decimals)
-    "JUP":  10_000_000,     # 10 JUP    (6 decimals)
+    "USDC":   100_000_000,    # 100 USDC   (6 dec)
+    "SOL":    100_000_000,    # 0.1 SOL    (9 dec)
+    "RAY":    10_000_000,     # 10 RAY     (6 dec)
+    "BONK":   10_000_000_000, # 100k BONK  (5 dec)
+    "JUP":    10_000_000,     # 10 JUP     (6 dec)
+    "WIF":    10_000_000,     # 10 WIF     (6 dec)
+    "MSOL":   100_000_000,    # 0.1 mSOL   (9 dec)
+    "POPCAT": 1_000_000_000,  # 1 POPCAT   (9 dec)
+    "BOME":   10_000_000,     # 10 BOME    (6 dec)
 }
 
 # ── SQLite spread logger ──────────────────────────────────────────────────────
@@ -167,14 +177,22 @@ def get_jupiter_quote(input_mint: str, output_mint: str, amount: int) -> dict | 
     }
     for attempt in range(3):
         try:
-            resp = requests.get(JUPITER_QUOTE_URL, params=params, timeout=5)
-            resp.raise_for_status()
-            return resp.json()
+            resp = requests.get(JUPITER_QUOTE_URL, params=params, timeout=8)
+            if resp.status_code != 200:
+                if attempt == 2:
+                    log.warning(f"Jupiter {resp.status_code}: {resp.text[:120]}")
+                time.sleep(0.5 * (attempt + 1))
+                continue
+            data = resp.json()
+            if "outAmount" not in data:
+                log.warning(f"Jupiter missing outAmount: {list(data.keys())} | {str(data)[:100]}")
+                return None
+            return data
         except requests.RequestException as e:
             if attempt == 2:
-                log.debug(f"Quote failed after 3 attempts: {e}")
+                log.warning(f"Quote request failed: {e}")
                 return None
-            time.sleep(0.3 * (attempt + 1))
+            time.sleep(0.5 * (attempt + 1))
     return None
 
 
@@ -408,6 +426,22 @@ def analyze_spreads() -> None:
     print(f"{'='*60}\n")
 
 
+# ── Jupiter connectivity check ────────────────────────────────────────────────
+def check_jupiter() -> None:
+    try:
+        r = requests.get(JUPITER_QUOTE_URL, params={
+            "inputMint": TOKENS["USDC"], "outputMint": TOKENS["SOL"],
+            "amount": 1_000_000, "slippageBps": 50,
+        }, timeout=10)
+        d = r.json()
+        if "outAmount" in d:
+            log.info(f"Jupiter OK: USDC->SOL outAmount={d['outAmount']} ({r.status_code})")
+        else:
+            log.warning(f"Jupiter bad response ({r.status_code}): {str(d)[:200]}")
+    except Exception as e:
+        log.error(f"Jupiter unreachable: {e}")
+
+
 # ── Main Loop ─────────────────────────────────────────────────────────────────
 def main() -> None:
     parser = argparse.ArgumentParser(description="Solana DEX Arbitrage Bot")
@@ -443,6 +477,7 @@ def main() -> None:
     global _db
     _db = init_db()
     log.info(f"Spread DB: {DB_PATH}")
+    check_jupiter()
     log.info(f"Scanning {len(ARB_ROUTES)} routes every {SCAN_INTERVAL_SEC}s ...")
 
     consecutive_failures = 0
