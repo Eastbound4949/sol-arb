@@ -73,8 +73,8 @@ MAX_CONSECUTIVE_FAILURES = int(os.getenv("MAX_CONSECUTIVE_FAILURES", "10"))
 MAX_TRADES_PER_HOUR      = int(os.getenv("MAX_TRADES_PER_HOUR", "5"))
 DB_PATH                  = os.getenv("DB_PATH", "spreads.db")
 
-JUPITER_QUOTE_URL = "https://quote-api.jup.ag/v6/quote"
-JUPITER_SWAP_URL  = "https://quote-api.jup.ag/v6/swap"
+JUPITER_QUOTE_URL = "https://api.jup.ag/swap/v1/quote"
+JUPITER_SWAP_URL  = "https://api.jup.ag/swap/v1/swap"
 
 # ── Token Registry ────────────────────────────────────────────────────────────
 TOKENS = {
