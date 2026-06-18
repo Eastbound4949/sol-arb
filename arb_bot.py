@@ -478,11 +478,12 @@ def main() -> None:
     _db = init_db()
     log.info(f"Spread DB: {DB_PATH}")
     check_jupiter()
-    log.info(f"Scanning {len(ARB_ROUTES)} routes every {SCAN_INTERVAL_SEC}s ...")
+    log.info(f"Scanning {len(ARB_ROUTES)} routes (1 per cycle, rotating) every {SCAN_INTERVAL_SEC}s ...")
 
     consecutive_failures = 0
     trades_this_hour     = 0
     hour_start           = datetime.utcnow()
+    route_idx            = 0
 
     while True:
         try:
@@ -492,7 +493,11 @@ def main() -> None:
                 hour_start       = now
 
             stats["scans"] += 1
-            scan_results = [r for r in (scan_route(rt) for rt in ARB_ROUTES) if r]
+            # Rotate one route per cycle — keeps Jupiter API calls within free-tier limits
+            current_route = ARB_ROUTES[route_idx % len(ARB_ROUTES)]
+            route_idx    += 1
+            result        = scan_route(current_route)
+            scan_results  = [result] if result else []
 
             # Log ALL results to SQLite for later frequency analysis
             for r in scan_results:
